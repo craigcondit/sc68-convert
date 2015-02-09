@@ -1,0 +1,49 @@
+diff -ur sc68-nocrew-r593.orig/configure sc68-nocrew-r593.new/configure
+--- sc68-nocrew-r593.orig/configure	2005-06-24 03:52:56.000000000 -0500
++++ sc68-nocrew-r593.new/configure	2015-02-07 09:05:21.000000000 -0600
+@@ -1997,7 +1997,7 @@
+ # Programs
+ SUBDIRS68="$SUBDIRS68 as68 sc68 info68 sourcer68 debug68"
+ # Data
+-SUBDIRS68="$SUBDIRS68 data info man"
++SUBDIRS68="$SUBDIRS68 data man"
+ 
+ # C-flags
+ MY_CFLAGS="-DHAVE_CONFIG_CONFIG68_H=1 -DNO_FALLBACK_CONFIG=1"
+@@ -11768,7 +11768,7 @@
+ BREAKPOINT68="if (1) { *(int *)1 = 0x12345678; } else"
+ 
+ 
+-                                                                                                                                                                                                                                                          ac_config_files="$ac_config_files Makefile config_type68.h config_option68.h config_package68.h config_platform68.h sc68.spec sc68-${VERSION}.ebuild:sc68.ebuild.in sc68.pc sc68-config as68/Makefile file68/Makefile io68/Makefile desa68/Makefile emu68/Makefile emu68debug/Makefile api68/Makefile sc68/Makefile info68/Makefile debug68/Makefile sourcer68/Makefile unice68/Makefile man/Makefile info/Makefile doc/Makefile data/Makefile"
++                                                                                                                                                                                                                                                          ac_config_files="$ac_config_files Makefile config_type68.h config_option68.h config_package68.h config_platform68.h sc68.spec sc68-${VERSION}.ebuild:sc68.ebuild.in sc68.pc sc68-config as68/Makefile file68/Makefile io68/Makefile desa68/Makefile emu68/Makefile emu68debug/Makefile api68/Makefile sc68/Makefile info68/Makefile debug68/Makefile sourcer68/Makefile unice68/Makefile man/Makefile doc/Makefile data/Makefile"
+ 
+ cat >confcache <<\_ACEOF
+ # This file is a shell script that caches the results of configure
+@@ -12341,7 +12341,6 @@
+   "sourcer68/Makefile" ) CONFIG_FILES="$CONFIG_FILES sourcer68/Makefile" ;;
+   "unice68/Makefile" ) CONFIG_FILES="$CONFIG_FILES unice68/Makefile" ;;
+   "man/Makefile" ) CONFIG_FILES="$CONFIG_FILES man/Makefile" ;;
+-  "info/Makefile" ) CONFIG_FILES="$CONFIG_FILES info/Makefile" ;;
+   "doc/Makefile" ) CONFIG_FILES="$CONFIG_FILES doc/Makefile" ;;
+   "data/Makefile" ) CONFIG_FILES="$CONFIG_FILES data/Makefile" ;;
+   "depfiles" ) CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
+diff -ur sc68-nocrew-r593.orig/configure.ac sc68-nocrew-r593.new/configure.ac
+--- sc68-nocrew-r593.orig/configure.ac	2005-06-24 03:52:56.000000000 -0500
++++ sc68-nocrew-r593.new/configure.ac	2015-02-07 09:05:04.000000000 -0600
+@@ -75,7 +75,7 @@
+ # Programs
+ SUBDIRS68="$SUBDIRS68 as68 sc68 info68 sourcer68 debug68"
+ # Data
+-SUBDIRS68="$SUBDIRS68 data info man"
++SUBDIRS68="$SUBDIRS68 data man"
+ 
+ # C-flags
+ MY_CFLAGS="-DHAVE_CONFIG_CONFIG68_H=1 -DNO_FALLBACK_CONFIG=1"
+@@ -298,7 +298,6 @@
+  sourcer68/Makefile
+  unice68/Makefile
+  man/Makefile
+- info/Makefile
+  doc/Makefile
+  data/Makefile])
+ AC_OUTPUT

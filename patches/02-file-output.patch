@@ -1,0 +1,181 @@
+diff -ur sc68-nocrew-r593.orig/io68/ymemul.c sc68-nocrew-r593.new/io68/ymemul.c
+--- sc68-nocrew-r593.orig/io68/ymemul.c	2005-06-24 03:52:56.000000000 -0500
++++ sc68-nocrew-r593.new/io68/ymemul.c	2015-02-08 20:03:27.000000000 -0600
+@@ -41,6 +41,8 @@
+ static int fake_cycle;
+ static int filter_cnt, filter_acu, filter_v;
+ static int output_level;
++static FILE * output_file = NULL;
++static u64 total_cycles = 0;
+ 
+ #ifdef _DEBUG
+   static int noiseCnt;
+@@ -77,6 +79,31 @@
+   /* 111 */ 0xFFF
+ };
+ 
++#define TYP_INIT 0 
++#define TYP_SMLE 1 
++#define TYP_BIGE 2 
++ 
++unsigned long long YM_htonll(unsigned long long src) { 
++  static int typ = TYP_INIT; 
++  unsigned char c; 
++  union { 
++    unsigned long long ull; 
++    unsigned char c[8]; 
++  } x; 
++  if (typ == TYP_INIT) { 
++    x.ull = 0x01; 
++    typ = (x.c[7] == 0x01ULL) ? TYP_BIGE : TYP_SMLE; 
++  } 
++  if (typ == TYP_BIGE) 
++    return src; 
++  x.ull = src; 
++  c = x.c[0]; x.c[0] = x.c[7]; x.c[7] = c; 
++  c = x.c[1]; x.c[1] = x.c[6]; x.c[6] = c; 
++  c = x.c[2]; x.c[2] = x.c[5]; x.c[5] = c; 
++  c = x.c[3]; x.c[3] = x.c[4]; x.c[4] = c; 
++  return x.ull; 
++} 
++
+ /* $$$ ARG this is exported with such a common name :( */
+ ym2149_t ym;
+ 
+@@ -251,6 +278,10 @@
+   return 0;
+ }
+ 
++void YM_set_output(FILE * new_output_file)
++{
++  output_file = new_output_file;
++}
+ /******************************************************
+ *                  Noise generator                    *
+ ******************************************************/
+@@ -846,6 +877,8 @@
+ {
+   /* $$$ Must check buffer overflow here */
+ 
++  total_cycles += cycle2mix;
++
+ #ifdef _DEBUG
+   if (cycle2mix&31) {
+     BREAKPOINT68;
+@@ -895,6 +928,15 @@
+ *************************************/
+ void YM_writereg(u8 reg, u8 v, cycle68_t cycle)
+ {
++  /* write to output file */
++  if (output_file != NULL) {
++    u64 current_cycle = YM_htonll(total_cycles + cycle);
++    fwrite(&current_cycle, 8, 1, output_file);
++    fwrite(&reg, 1, 1, output_file);
++    fwrite(&v, 1, 1, output_file); 
++    fflush(output_file);
++  }
++
+   switch(reg)
+   {
+     case YM_PERL(0): case YM_PERH(0):
+diff -ur sc68-nocrew-r593.orig/io68/ymemul.h sc68-nocrew-r593.new/io68/ymemul.h
+--- sc68-nocrew-r593.orig/io68/ymemul.h	2005-06-24 03:52:56.000000000 -0500
++++ sc68-nocrew-r593.new/io68/ymemul.h	2015-02-07 09:34:14.000000000 -0600
+@@ -13,6 +13,7 @@
+ #ifndef _YM_EMUL_H_
+ #define _YM_EMUL_H_
+ 
++#include <stdio.h>
+ #include "emu68/type68.h"
+ 
+ #ifdef __cplusplus
+@@ -127,6 +128,11 @@
+  */
+ int YM_init(void);
+ 
++/**
++ * Set output file to write to (can be NULL)
++ */
++void YM_set_output(FILE *);
++
+ /**@}*/
+ 
+ 
+diff -ur sc68-nocrew-r593.orig/sc68/sc68.c sc68-nocrew-r593.new/sc68/sc68.c
+--- sc68-nocrew-r593.orig/sc68/sc68.c	2005-06-24 03:52:56.000000000 -0500
++++ sc68-nocrew-r593.new/sc68/sc68.c	2015-02-08 09:38:55.000000000 -0600
+@@ -31,6 +31,7 @@
+ 
+ /* sc68 includes */
+ #include "api68/api68.h"
++#include "io68/ymemul.h"
+ 
+ static api68_t * sc68 = 0;
+ 
+@@ -47,6 +48,7 @@
+   puts(
+     "sc68 - Atari ST and Amiga music emulator\n"
+     "Copyright (C) 1998-2003 Benjamin Gerard <ben@sasghipa.com>\n"
++    "Modified for YMZ output 2015 Craig Condit <ccondit@randomcoder.org>\n"
+     "\n"
+     "This program is free software.\n"
+     "\n"
+@@ -58,6 +60,7 @@
+     "  --quiet            : Do not display music info\n"
+     "  --track=#[,#]      : Choose track to play [0=all tracks]\n"
+     "                       and number of loop [0=infinite]\n"
++    "  --ymz_output=file  : Set output file for YMZ register output\n"
+     "  --sc68_data=path   : Set shared resource path (prior to ${SC68_DATA})\n"
+     "  --sc68_user=path   : Set user resource path (prior to ${SC68_USER})\n"
+     "  --sc68_music=path  : Set local music path (prior to ${SC68_USER})\n"
+@@ -203,12 +206,15 @@
+ int main(int na, char **a)
+ {
+   int i;
++  int j;
+   int help = 0;
+   char * fname = 0;
+   int track = -1;
+   int loop = -1;
+   int err = 1;
+   api68_init_t init68;
++  char * ymz_output = 0;
++  FILE * ymz_file = 0;
+ 
+   /* Scan help and info options */
+   for (i=1; i<na; ++i) {
+@@ -221,6 +227,16 @@
+       return Version();
+     } else if (!strcmp(a[i],"--quiet")) {
+       quiet = 1;
++      for (j=i, --na; j<na; ++j) {
++        a[j] = a[j+1];
++      }
++      i--;
++    } else if (strstr(a[i],"--ymz_output=") == a[i]) {
++      ymz_output = a[i] + 13;
++      for (j=i, --na; j<na; ++j) {
++        a[j] = a[j+1];
++      }
++      i--;
+     }
+   }
+   if (na<2 || help) {
+@@ -278,7 +294,16 @@
+   if (api68_load_file(sc68, fname)) {
+     goto error;
+   }
+-    
++
++  /* Open YMZ output file */
++  if (ymz_output) {
++    FILE * ymz_file = fopen(ymz_output, "wb");
++    if (!ymz_file) {
++      goto error;
++    }
++    YM_set_output(ymz_file); 
++  }
++
+   /** @todo  Set out stream mode to binary. */
+ 
+   /* Loop */
